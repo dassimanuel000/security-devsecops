@@ -55,7 +55,7 @@ graph LR
 
 ### 1️⃣ **Clone & Setup**
 ```bash
-git clone https://github.com/votre-username/security-devsecops.git
+git clone https://github.com/dassimanuel000/security-devsecops.git
 cd security-devsecops
 chmod +x setup.sh
 ./setup.sh
@@ -121,15 +121,6 @@ security-devsecops/
 └── 🐳 docker-compose.yml         # Stack locale
 ```
 
----
-
-## 🎬 **Démonstration Vidéo**
-
-[![Demo Video](https://img.youtube.com/vi/DEMO_VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=DEMO_VIDEO_ID)
-
-**🕐 30 minutes** de démonstration complète
-
----
 
 ## 📈 **Métriques & ROI**
 
@@ -211,7 +202,7 @@ SECURITY_TEAM = [
 5. **Pull Request** 🚀
 
 ### 🐛 **Bug Reports**
-Utilisez les [GitHub Issues](https://github.com/username/security-devsecops/issues) avec le template fourni.
+Utilisez les [GitHub Issues](https://github.com/dassimanuel000/security-devsecops/issues) avec le template fourni.
 
 
 ### 🏆 **Certifications Recommandées**
@@ -228,12 +219,6 @@ MIT License - voir [LICENSE](LICENSE) pour détails.
 
 ---
 
-## 🏷️ **Tags**
-
-`devsecops` `security` `gitlab-ci` `docker` `kubernetes` `sast` `sca` `sbom` `siem` `vulnerability-scanner` `automation` `devops` `cybersecurity`
-
----
-
 ## 👨‍💻 **Contact :** 
 [LinkedIn](https://linkedin.com/in/manuel-dassi)
 [GitHub](https://github.com/dassimanuel000)
@@ -244,5 +229,5 @@ MIT License - voir [LICENSE](LICENSE) pour détails.
 
 ```bash
 # Clone le repo et commencez votre sécurisation dès maintenant !
-git clone https://github.com/username/security-devsecops.git
+git clone https://github.com/dassimanuel000/security-devsecops.git
 ```
