@@ -1,0 +1,130 @@
+stages:
+  - security-scan
+  - sbom-generation
+  - container-scan
+  - vulnerability-analysis
+  - siem-integration
+  - security-gates
+  - deploy
+
+variables:
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+  SECURITY_THRESHOLD: "HIGH"
+
+# 1. SAST - Analyse code source
+sast-scan:
+  stage: security-scan
+  image: sonarqube-scanner:latest
+  script:
+    - sonar-scanner
+      -Dsonar.projectKey=$CI_PROJECT_NAME
+      -Dsonar.sources=src/
+      -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.login=$SONAR_TOKEN
+    - curl -s "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=$CI_PROJECT_NAME" > sonar-results.json
+  artifacts:
+    reports:
+      sast: sonar-results.json
+    paths:
+      - sonar-results.json
+
+# 2. Dependency Scanning
+dependency-scan:
+  stage: security-scan
+  image: owasp/dependency-check:latest
+  script:
+    - dependency-check.sh 
+      --project "$CI_PROJECT_NAME"
+      --scan ./src
+      --format JSON
+      --out ./reports/
+    - trivy fs --format json --output dependency-vulns.json .
+  artifacts:
+    paths:
+      - reports/dependency-check-report.json
+      - dependency-vulns.json
+
+# 3. SBOM Generation
+generate-sbom:
+  stage: sbom-generation
+  image: anchore/syft:latest
+  script:
+    - syft packages dir:. -o spdx-json > artifacts/sbom.json
+    - syft packages dir:. -o cyclonedx-json > artifacts/sbom-cyclone.json
+    - python3 security/scripts/sbom-enricher.py # Script custom pour enrichir SBOM
+  artifacts:
+    paths:
+      - artifacts/sbom*.json
+
+# 4. Container Build & Scan
+container-scan:
+  stage: container-scan
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    # Build image
+    - docker build -t $DOCKER_IMAGE .
+    
+    # Scan avec Grype
+    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock 
+      anchore/grype:latest $DOCKER_IMAGE -o json > grype-scan.json
+    
+    # Scan avec Trivy
+    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock 
+      aquasec/trivy:latest image --format json --output trivy-scan.json $DOCKER_IMAGE
+    
+    - docker push $DOCKER_IMAGE
+  artifacts:
+    paths:
+      - grype-scan.json
+      - trivy-scan.json
+
+# 5. Vulnerability Analysis & Report Generation
+vulnerability-analysis:
+  stage: vulnerability-analysis
+  image: python:3.9-slim
+  script:
+    - pip install jinja2 pandas matplotlib seaborn
+    - python3 security/scripts/vulnerability-aggregator.py
+  artifacts:
+    paths:
+      - reports/vulnerability-dashboard.html
+      - reports/vulnerability-summary.json
+      - reports/security-metrics.json
+
+# 6. SIEM Integration
+siem-integration:
+  stage: siem-integration
+  image: alpine:latest
+  script:
+    - apk add --no-cache curl jq
+    - python3 security/scripts/siem-forwarder.py
+      --elastic-url $ELASTIC_URL
+      --index security-vulns-$CI_PROJECT_NAME
+      --data reports/vulnerability-summary.json
+
+# 7. Security Gates
+security-gates:
+  stage: security-gates
+  image: alpine:latest
+  script:
+    - python3 security/scripts/security-gate-validator.py
+      --threshold $SECURITY_THRESHOLD
+      --report reports/vulnerability-summary.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# 8. Conditional Deploy
+deploy-production:
+  stage: deploy
+  script:
+    - echo "Deploying secure application..."
+    - kubectl apply -f k8s/
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  dependencies:
+    - security-gates
